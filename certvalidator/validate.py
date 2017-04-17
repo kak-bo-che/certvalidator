@@ -364,78 +364,79 @@ def _validate_path(validation_context, path, end_entity_name_override=None):
 
         # Step 2 a 3 - CRL/OCSP
         if not validation_context._skip_revocation_checks:
-            status_good = False
-            revocation_check_failed = False
-            matched = False
-            soft_fail = False
-            failures = []
+            _check_revocation(cert, path, validation_context, index, end_entity_name_override)
+            # status_good = False
+            # revocation_check_failed = False
+            # matched = False
+            # soft_fail = False
+            # failures = []
 
-            if cert.ocsp_urls or validation_context.revocation_mode == 'require':
-                try:
-                    verify_ocsp_response(
-                        cert,
-                        path,
-                        validation_context,
-                        cert_description=_cert_type(
-                            index,
-                            last_index,
-                            end_entity_name_override,
-                            definite=True
-                        ),
-                        end_entity_name_override=end_entity_name_override
-                    )
-                    status_good = True
-                    matched = True
-                except (OCSPValidationIndeterminateError) as e:
-                    failures.extend([failure[0] for failure in e.failures])
-                    revocation_check_failed = True
-                    matched = True
-                except (SoftFailError):
-                    soft_fail = True
-                except (OCSPNoMatchesError):
-                    pass
+            # if cert.ocsp_urls or validation_context.revocation_mode == 'require':
+            #     try:
+            #         verify_ocsp_response(
+            #             cert,
+            #             path,
+            #             validation_context,
+            #             cert_description=_cert_type(
+            #                 index,
+            #                 last_index,
+            #                 end_entity_name_override,
+            #                 definite=True
+            #             ),
+            #             end_entity_name_override=end_entity_name_override
+            #         )
+            #         status_good = True
+            #         matched = True
+            #     except (OCSPValidationIndeterminateError) as e:
+            #         failures.extend([failure[0] for failure in e.failures])
+            #         revocation_check_failed = True
+            #         matched = True
+            #     except (SoftFailError):
+            #         soft_fail = True
+            #     except (OCSPNoMatchesError):
+            #         pass
 
-            if not status_good and (cert.crl_distribution_points or validation_context.revocation_mode == 'require'):
-                try:
-                    cert_description = _cert_type(index, last_index, end_entity_name_override, definite=True)
-                    verify_crl(
-                        cert,
-                        path,
-                        validation_context,
-                        cert_description=cert_description,
-                        end_entity_name_override=end_entity_name_override
-                    )
-                    revocation_check_failed = False
-                    status_good = True
-                    matched = True
-                except (CRLValidationIndeterminateError) as e:
-                    failures.extend([failure[0] for failure in e.failures])
-                    revocation_check_failed = True
-                    matched = True
-                except (SoftFailError):
-                    soft_fail = True
-                except (CRLNoMatchesError):
-                    pass
+            # if not status_good and (cert.crl_distribution_points or validation_context.revocation_mode == 'require'):
+            #     try:
+            #         cert_description = _cert_type(index, last_index, end_entity_name_override, definite=True)
+            #         verify_crl(
+            #             cert,
+            #             path,
+            #             validation_context,
+            #             cert_description=cert_description,
+            #             end_entity_name_override=end_entity_name_override
+            #         )
+            #         revocation_check_failed = False
+            #         status_good = True
+            #         matched = True
+            #     except (CRLValidationIndeterminateError) as e:
+            #         failures.extend([failure[0] for failure in e.failures])
+            #         revocation_check_failed = True
+            #         matched = True
+            #     except (SoftFailError):
+            #         soft_fail = True
+            #     except (CRLNoMatchesError):
+            #         pass
 
-            if not soft_fail:
-                if not matched and validation_context.revocation_mode == 'require':
-                    raise PathValidationError(pretty_message(
-                        '''
-                        The path could not be validated because no revocation
-                        information could be found for %s
-                        ''',
-                        _cert_type(index, last_index, end_entity_name_override, definite=True)
-                    ))
+            # if not soft_fail:
+            #     if not matched and validation_context.revocation_mode == 'require':
+            #         raise PathValidationError(pretty_message(
+            #             '''
+            #             The path could not be validated because no revocation
+            #             information could be found for %s
+            #             ''',
+            #             _cert_type(index, last_index, end_entity_name_override, definite=True)
+            #         ))
 
-                if not status_good and revocation_check_failed:
-                    raise PathValidationError(pretty_message(
-                        '''
-                        The path could not be validated because the %s revocation
-                        checks failed: %s
-                        ''',
-                        _cert_type(index, last_index, end_entity_name_override),
-                        '; '.join(failures)
-                    ))
+            #     if not status_good and revocation_check_failed:
+            #         raise PathValidationError(pretty_message(
+            #             '''
+            #             The path could not be validated because the %s revocation
+            #             checks failed: %s
+            #             ''',
+            #             _cert_type(index, last_index, end_entity_name_override),
+            #             '; '.join(failures)
+            #         ))
 
         # Step 2 a 4
         if cert.issuer != working_issuer_name:
@@ -733,6 +734,89 @@ def _validate_path(validation_context, path, end_entity_name_override=None):
 
     return cert
 
+def check_revocation(path, validation_context):
+    index = 1
+    last_index = len(path) - 1
+    while index <= last_index:
+        cert = path[index]
+        _check_revocation(cert, path, validation_context, index)
+        index += 1
+
+# I want to reuse this...
+def _check_revocation(cert, path, validation_context, index, end_entity_name_override=None):
+    status_good = False
+    last_index = len(path) - 1
+    revocation_check_failed = False
+    matched = False
+    soft_fail = False
+    failures = []
+
+    if cert.ocsp_urls or validation_context.revocation_mode == 'require':
+        try:
+            verify_ocsp_response(
+                cert,
+                path,
+                validation_context,
+                cert_description=_cert_type(
+                    index,
+                    last_index,
+                    end_entity_name_override,
+                    definite=True
+                ),
+                end_entity_name_override=end_entity_name_override
+            )
+            status_good = True
+            matched = True
+        except (OCSPValidationIndeterminateError) as e:
+            failures.extend([failure[0] for failure in e.failures])
+            revocation_check_failed = True
+            matched = True
+        except (SoftFailError):
+            soft_fail = True
+        except (OCSPNoMatchesError):
+            pass
+
+    if not status_good and (cert.crl_distribution_points or validation_context.revocation_mode == 'require'):
+        try:
+            cert_description = _cert_type(index, last_index, end_entity_name_override, definite=True)
+            verify_crl(
+                cert,
+                path,
+                validation_context,
+                cert_description=cert_description,
+                end_entity_name_override=end_entity_name_override
+            )
+            revocation_check_failed = False
+            status_good = True
+            matched = True
+        except (CRLValidationIndeterminateError) as e:
+            failures.extend([failure[0] for failure in e.failures])
+            revocation_check_failed = True
+            matched = True
+        except (SoftFailError):
+            soft_fail = True
+        except (CRLNoMatchesError):
+            pass
+
+    if not soft_fail:
+        if not matched and validation_context.revocation_mode == 'require':
+            raise PathValidationError(pretty_message(
+                '''
+                The path could not be validated because no revocation
+                information could be found for %s
+                ''',
+                _cert_type(index, last_index, end_entity_name_override, definite=True)
+            ))
+
+        if not status_good and revocation_check_failed:
+            raise PathValidationError(pretty_message(
+                '''
+                The path could not be validated because the %s revocation
+                checks failed: %s
+                ''',
+                _cert_type(index, last_index, end_entity_name_override),
+                '; '.join(failures)
+            ))
 
 def _cert_type(index, last_index, end_entity_name_override, definite=False):
     """
@@ -1030,9 +1114,9 @@ def verify_ocsp_response(cert, path, validation_context, cert_description=None, 
                 continue
 
         # If the cert signing the OCSP response is not the issuer, it must be issued
-        # by the cert issuer and be valid for OCSP responses
+        # by the cert issuer and be valid for OCSP responses'
         if issuer.issuer_serial != signing_cert.issuer_serial:
-            if signing_cert_issuer.issuer_serial != issuer.issuer_serial:
+            if signing_cert.issuer_serial != issuer.issuer_serial:
                 failures.append((
                     pretty_message(
                         '''

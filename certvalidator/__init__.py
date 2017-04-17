@@ -6,7 +6,7 @@ from asn1crypto.x509 import Certificate
 
 from .context import ValidationContext
 from .errors import ValidationError, PathBuildingError, InvalidCertificateError
-from .validate import validate_path, validate_tls_hostname, validate_usage
+from .validate import validate_path, validate_tls_hostname, validate_usage, check_revocation
 from ._errors import pretty_message
 from ._types import type_name, str_cls, byte_cls
 from ._version import __version__, __version_info__
@@ -222,3 +222,18 @@ class CertificateValidator():
         self._validate_path()
         validate_tls_hostname(self._context, self._certificate, hostname)
         return self._path
+
+    def check_revocation(self):
+        try:
+            paths = self._context.certificate_registry.build_paths(self._certificate)
+        except (PathBuildingError) as e:
+            if self._certificate.self_signed in set(['yes', 'maybe']):
+                raise InvalidCertificateError(pretty_message(
+                    '''
+                    The X.509 certificate provided is self-signed - "%s"
+                    ''',
+                    self._certificate.subject.human_friendly
+                ))
+            raise
+        for path in paths:
+            check_revocation(path, self._context)
