@@ -5,7 +5,7 @@ from setuptools import setup, find_packages, Command
 
 try:
     from certvalidator import version
-    __version__ = version.__version__,
+    __version__ = version.__version__
 except ImportError:
     # __init__.py is loaded and fails with oscrypto, there is probably a better
     # way to deal with this than exec
