@@ -3,8 +3,13 @@ import shutil
 
 from setuptools import setup, find_packages, Command
 
-from certvalidator import version
-
+try:
+    from certvalidator import version
+    __version__ = version.__version__,
+except ImportError:
+    # __init__.py is loaded and fails with oscrypto, there is probably a better
+    # way to deal with this than exec
+    exec(open('certvalidator/version.py').read())
 
 class CleanCommand(Command):
     user_options = [
@@ -27,7 +32,7 @@ class CleanCommand(Command):
 
 setup(
     name='certvalidator',
-    version=version.__version__,
+    version=__version__,
 
     description='Validates X.509 certificates and paths',
     long_description='Docs for this project are maintained at https://github.com/wbond/certvalidator#readme.',
